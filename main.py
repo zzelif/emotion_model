@@ -19,9 +19,6 @@ from collections import Counter
 from tensorflow.python.keras.layers import Lambda
 from tensorflow.python.keras.utils.version_utils import callbacks
 
-# Check GPU Availability
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-
 def scheduler(epoch, lr):
     if epoch < 10:
         return lr
