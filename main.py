@@ -7,15 +7,30 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropou
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 from imblearn.over_sampling import SMOTE
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import cv2
 import os
+import matplotlib.pyplot as plt
+from collections import Counter
+from tensorflow.python.keras.layers import Lambda
+from tensorflow.python.keras.utils.version_utils import callbacks
+
+# Check GPU Availability
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+
+def scheduler(epoch, lr):
+    if epoch < 10:
+        return lr
+    else:
+        return lr * tf.math.exp(-0.1)
 
 # Set paths for datasets
 train_data_dir = 'Dataset-DS/Train'
-test_data_dir = 'Dataset-DS/Train'
+# test_data_dir = 'Dataset-DS/Train'
 
 # Define image size and batch size
 img_size = (48, 48)
@@ -30,7 +45,7 @@ train_datagen = ImageDataGenerator(
     validation_split=0.2
 )
 
-test_datagen = ImageDataGenerator(rescale=1. / 255)
+# test_datagen = ImageDataGenerator(rescale=1. / 255)
 
 # Data generators
 train_generator = train_datagen.flow_from_directory(
@@ -49,16 +64,36 @@ validation_generator = train_datagen.flow_from_directory(
     subset='validation'
 )
 
-test_generator = test_datagen.flow_from_directory(
-    test_data_dir,
-    target_size=img_size,
-    batch_size=batch_size,
-    class_mode='categorical'
-)
+# test_generator = test_datagen.flow_from_directory(
+#     test_data_dir,
+#     target_size=img_size,
+#     batch_size=batch_size,
+#     class_mode='categorical'
+# )
 
 # Emotion labels
-emotion_labels = ['Angry', 'Happy', 'Neutral', 'Sad', 'Surprise']
+emotion_labels = list(train_generator.class_indices.keys())
 
+# Prepare data for SMOTE
+images, labels = [], []
+for i in range(len(train_generator)):  # Loop through the generator batches
+    batch_images, batch_labels = train_generator[i]
+    images.append(batch_images)
+    labels.append(batch_labels)
+    if len(images) * batch_size >= train_generator.samples:  # Stop when all samples are covered
+        break
+
+images = np.vstack(images)
+labels = np.argmax(np.vstack(labels), axis=1)  # Convert one-hot to class indices
+
+# Reshape data for SMOTE
+x_train_flat = images.reshape((images.shape[0], -1))
+smote = SMOTE(random_state=42)
+x_resampled, y_resampled = smote.fit_resample(x_train_flat, labels)
+
+# Reshape back to image dimensions
+x_resampled = x_resampled.reshape((-1, img_size[0], img_size[1], 3))
+y_resampled = tf.keras.utils.to_categorical(y_resampled, num_classes=len(emotion_labels))
 
 # ------------------------------
 # 0. U-Net Segmentation CNN
@@ -93,7 +128,7 @@ def build_unet_model(input_size=(48, 48, 3)):
     outputs = layers.Conv2D(1, (1, 1), activation='sigmoid')(conv5)
 
     model = Model(inputs, outputs)
-    model.compile(optimizer=Adam(learning_rate=0.0001), loss=keras.losses.BinaryCrossentropy(), metrics=['accuracy'])
+    model.compile(optimizer=Adam(learning_rate=0.0001), loss=keras.losses.BinaryCrossentropy(), metrics=['accuracy', 'Precision', 'Recall'])
 
     return model
 
@@ -122,7 +157,7 @@ def build_microexpression_model():
 
     model.compile(optimizer=Adam(learning_rate=0.0001),
                   loss=keras.losses.CategoricalCrossentropy(),
-                  metrics=['accuracy'])
+                  metrics=['accuracy', 'Precision', 'Recall'])
     return model
 
 
@@ -130,27 +165,37 @@ def build_microexpression_model():
 # 2. MobileNetV2 Transfer Learning
 # ------------------------------
 def build_mobilenet_model():
-    base_mobilenet = MobileNetV2(weights='imagenet', include_top=False, input_shape=(48, 48, 3))
+    base_mobilenet = MobileNetV2(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
 
+    # Freeze the initial layers
     for layer in base_mobilenet.layers:
         layer.trainable = False
 
-    model = Sequential([
-        base_mobilenet,
-        GlobalAveragePooling2D(),
-        Dense(256, activation='relu'),
-        Dropout(0.5),
-        Dense(len(emotion_labels), activation='softmax')
-    ])
+    # Input layer with resizing
+    inputs = Input(shape=(48, 48, 3))
+    resized_inputs = Lambda(lambda x: tf.image.resize(x, (128, 128)))(inputs)
 
-    for layer in base_mobilenet.layers[-50:]:
+    # Extract features using MobileNetV2
+    mobilenet_features = base_mobilenet(resized_inputs)
+    pooled_features = GlobalAveragePooling2D()(mobilenet_features)
+
+    # Add the dense layers for classification
+    dense_1 = Dense(256, activation='relu')(pooled_features)
+    dropout = Dropout(0.5)(dense_1)
+    outputs = Dense(len(emotion_labels), activation='softmax')(dropout)
+
+    # Create the complete model
+    model = Model(inputs=inputs, outputs=outputs)
+
+    # Optionally, unfreeze some layers for fine-tuning
+    for layer in base_mobilenet.layers[-100:]:
         layer.trainable = True
 
+    # Compile the model
     model.compile(optimizer=Adam(learning_rate=0.0001),
                   loss=keras.losses.CategoricalCrossentropy(),
-                  metrics=['accuracy'])
+                  metrics=['accuracy', 'Precision', 'Recall'])
     return model
-
 
 # ------------------------------
 # 3. Combined Model
@@ -168,7 +213,7 @@ def build_combined_model():
 
     combined_model.compile(optimizer=Adam(learning_rate=0.0001),
                            loss=keras.losses.CategoricalCrossentropy(),
-                           metrics=['accuracy'])
+                           metrics=['accuracy', 'Precision', 'Recall'])
     return combined_model
 
 
@@ -185,20 +230,21 @@ def train_and_evaluate_model():
 
     # Train the model
     model.fit(
-        train_generator,
+        x_resampled, y_resampled,
         epochs=20,
         batch_size=32,
         validation_split=0.2,
         validation_data=validation_generator,
-        callbacks=[early_stopping, checkpoint]
+        callbacks=[early_stopping, checkpoint, callbacks.LearningRateScheduler(scheduler)]
     )
 
     # Evaluate the model
-    test_loss, test_acc = model.evaluate(test_generator)
+    test_loss, test_acc, test_precision, test_recall = model.evaluate(validation_generator)
     print(f"Test Accuracy: {test_acc}")
+    print(f"Test Precision: {test_precision}")
+    print(f"Test Recall: {test_recall}")
 
     return model
-
 
 # Train and get the trained model
 model = train_and_evaluate_model()
@@ -267,6 +313,9 @@ def predict_emotion_from_image(image_path, emotion_model):
 
 
 def predict_emotions_in_directory(directory_path, emotion_model):
+    # Initialize a Counter
+    emotion_tally = Counter()
+
     # Get all image file paths in the directory
     image_paths = [os.path.join(directory_path, fname) for fname in os.listdir(directory_path) if
                    fname.endswith(('jpg', 'png', 'jpeg'))]
@@ -275,10 +324,18 @@ def predict_emotions_in_directory(directory_path, emotion_model):
     for image_path in image_paths:
         predicted_emotion, confidence_level = predict_emotion_from_image(image_path, emotion_model)
 
+        emotion_tally[predicted_emotion] += 1
+
         # Print the result
         print(f"Image: {image_path}")
         print(f"Predicted Emotion: {predicted_emotion} ({confidence_level * 100:.2f}%)")
         print("-" * 50)
+
+    print("Emotion Tally:")
+    for emotion, count in emotion_tally.items():
+        print(f"{emotion}: {count}")
+
+    return emotion_tally
 
 
 # Example usage:
