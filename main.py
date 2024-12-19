@@ -57,7 +57,7 @@ test_generator = test_datagen.flow_from_directory(
 )
 
 # Emotion labels
-emotion_labels = ['Happiness', 'Anger', 'Sadness', 'Surprise', 'Neutrality']
+emotion_labels = ['Angry', 'Happy', 'Neutral', 'Sad', 'Surprise']
 
 
 # ------------------------------
@@ -67,32 +67,32 @@ def build_unet_model(input_size=(48, 48, 3)):
     inputs = layers.Input(input_size)
 
     # Encoder: downsampling
-    conv1 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(inputs)
-    conv1 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(conv1)
+    conv1 = layers.Conv2D(32, (3, 3), activation='relu', padding='SAME')(inputs)
+    conv1 = layers.Conv2D(32, (3, 3), activation='relu', padding='SAME')(conv1)
     pool1 = layers.MaxPooling2D((2, 2))(conv1)
 
-    conv2 = layers.Conv2D(128, (3, 3), activation='relu', padding='SAME')(pool1)
-    conv2 = layers.Conv2D(128, (3, 3), activation='relu', padding='SAME')(conv2)
+    conv2 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(pool1)
+    conv2 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(conv2)
     pool2 = layers.MaxPooling2D((2, 2))(conv2)
 
     # Bottleneck
-    conv3 = layers.Conv2D(256, (3, 3), activation='relu', padding='SAME')(pool2)
-    conv3 = layers.Conv2D(256, (3, 3), activation='relu', padding='SAME')(conv3)
+    conv3 = layers.Conv2D(128, (3, 3), activation='relu', padding='SAME')(pool2)
+    conv3 = layers.Conv2D(128, (3, 3), activation='relu', padding='SAME')(conv3)
 
     # Decoder: upsampling
     up1 = layers.UpSampling2D((2, 2))(conv3)
     concat1 = layers.concatenate([up1, conv2], axis=3)
-    conv4 = layers.Conv2D(128, (3, 3), activation='relu', padding='SAME')(concat1)
-    conv4 = layers.Conv2D(128, (3, 3), activation='relu', padding='SAME')(conv4)
+    conv4 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(concat1)
+    conv4 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(conv4)
 
     up2 = layers.UpSampling2D((2, 2))(conv4)
     concat2 = layers.concatenate([up2, conv1], axis=3)
-    conv5 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(concat2)
-    conv5 = layers.Conv2D(64, (3, 3), activation='relu', padding='SAME')(conv5)
+    conv5 = layers.Conv2D(32, (3, 3), activation='relu', padding='SAME')(concat2)
+    conv5 = layers.Conv2D(32, (3, 3), activation='relu', padding='SAME')(conv5)
 
     outputs = layers.Conv2D(1, (1, 1), activation='sigmoid')(conv5)
 
-    model = models.Model(inputs, outputs)
+    model = Model(inputs, outputs)
     model.compile(optimizer=Adam(learning_rate=0.0001), loss=keras.losses.BinaryCrossentropy(), metrics=['accuracy'])
 
     return model
@@ -186,7 +186,7 @@ def train_and_evaluate_model():
     # Train the model
     model.fit(
         train_generator,
-        epochs=10,
+        epochs=20,
         batch_size=32,
         validation_split=0.2,
         validation_data=validation_generator,
