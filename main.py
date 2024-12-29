@@ -156,7 +156,8 @@ def plot_metrics(history):
     plt.legend()
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig('training_metrics.png')  # Save the figure, then close. Use plt.show() for immediate show
+    plt.close()
 
 #Train and Evaluate the model
 def train_and_evaluate_model():
@@ -175,8 +176,6 @@ def train_and_evaluate_model():
         callbacks=[early_stopping, checkpoint, lr_scheduler]
     )
 
-    plot_metrics(history)
-
     val_predictions = model.predict(validation_generator)
     val_labels = validation_generator.classes
     predicted_classes = np.argmax(val_predictions, axis=1)
@@ -191,6 +190,8 @@ def train_and_evaluate_model():
     print(classification_report(val_labels, predicted_classes, target_names=emotion_labels))
     print("Confusion Matrix:")
     print(confusion_matrix(val_labels, predicted_classes))
+
+    plot_metrics(history)
 
     return model
 

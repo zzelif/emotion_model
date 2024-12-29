@@ -208,6 +208,30 @@ def build_combined_model():
                            metrics=['accuracy', 'Precision', 'Recall'])
     return combined_model
 
+#Shows figure of graph for metrics
+def plot_metrics(history):
+    plt.figure(figsize=(12,4))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(history.history['accuracy'], label='Train Accuracy')
+    plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+    plt.title('Model Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+
+    # Plot Training & Validation Loss
+    plt.subplot(1, 2, 2)
+    plt.plot(history.history['loss'], label='Train Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.title('Model Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('training_metrics_0.png')  # Save the figure, then close. Use plt.show() for immediate show
+    plt.close()
 
 # ------------------------------
 # 4. Training and Evaluation
@@ -254,29 +278,6 @@ def train_and_evaluate_model():
 # Train and get the trained model
 model = train_and_evaluate_model()
 
-def plot_metrics(history):
-    plt.figure(figsize=(12,4))
-
-    plt.subplot(1, 2, 1)
-    plt.plot(history.history['accuracy'], label='Train Accuracy')
-    plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
-    plt.title('Model Accuracy')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.legend()
-
-    # Plot Training & Validation Loss
-    plt.subplot(1, 2, 2)
-    plt.plot(history.history['loss'], label='Train Loss')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
-    plt.title('Model Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-
-    plt.tight_layout()
-    plt.show()
-
 # ------------------------------
 # 5. Realtime Emotion Detection using Webcam
 # ------------------------------
@@ -305,7 +306,6 @@ def plot_metrics(history):
 #     predicted_emotion = emotion_labels[np.argmax(predictions)]  # Get the emotion label with the highest probability
 #     confidence_level = predictions[0][np.argmax(predictions)]
 #     return predicted_emotion, confidence_level
-
 
 def load_and_preprocess_image(image_path):
     # Load the image
