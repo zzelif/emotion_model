@@ -42,6 +42,9 @@ for emotion, path in csv_paths.items():
 combined_df = pd.concat(dfs, ignore_index=True)
 combined_df.columns = combined_df.columns.str.strip()
 
+# Normalize filenames in the CSV
+combined_df['filename'] = combined_df['filename'].str.strip().str.lower().str.replace('.csv', '')
+
 # Save combined data for future use
 combined_df.to_csv("combined_au_data.csv", index=False)
 print(f"Combined {len(combined_df)} rows into one dataset.")
@@ -68,6 +71,8 @@ else:
 selected_columns = ['filename'] + [col for col in selected_aus if col in combined_df.columns] + ['emotion']
 filtered_df = combined_df[selected_columns]
 
+# filtered_df = (filtered_df - filtered_df.mean()) / filtered_df.std()
+
 # Save filtered data
 filtered_df.to_csv("filtered_au_data.csv", index=False)
 print(f"Filtered data saved with shape {filtered_df.shape}")
@@ -78,7 +83,11 @@ image_files = []
 for emotion in ['Angry', 'Happy', 'Neutral', 'Sad', 'Surprised']:
     emotion_dir = os.path.join(image_dir, emotion)
     if os.path.exists(emotion_dir):
-        image_files.extend([f for f in os.listdir(emotion_dir) if f.endswith(('.jpg', '.png'))])
+        image_files.extend([f.lower().strip().replace('.jpg', '').replace('.png', '') for f in os.listdir(emotion_dir)])
+
+# Debugging: Check first few filenames
+print("First few filenames in DataFrame:", filtered_df['filename'].unique()[:10])
+print("First few image filenames:", image_files[:10])
 
 # Filter rows based on matching filenames
 filtered_df = filtered_df[filtered_df['filename'].isin(image_files)]

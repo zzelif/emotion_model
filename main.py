@@ -20,15 +20,22 @@ from collections import Counter
 # Adjust data augmentation
 img_size = (48, 48)
 batch_size = 32
+
 train_data_dir = 'Dataset/Train_1'
+# test_data_dir = ''
 
 train_datagen = ImageDataGenerator(
     rescale=1. / 255,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
     shear_range=0.2,
     zoom_range=0.2,
     horizontal_flip=True,
+    brightness_range=[0.8, 1.2],
     validation_split=0.2
 )
+# test_datagen = ImageDataGenerator(rescale=1. / 255)
 
 train_generator = train_datagen.flow_from_directory(
     train_data_dir,
@@ -45,6 +52,14 @@ validation_generator = train_datagen.flow_from_directory(
     class_mode='categorical',
     subset='validation'
 )
+
+# test_generator = test_datagen.flow_from_directory(
+#     train_data_dir,
+#     target_size=img_size,
+#     batch_size=batch_size,
+#     class_mode='categorical',
+#     subset='testing'
+# )
 
 emotion_labels = list(train_generator.class_indices.keys())
 
@@ -125,7 +140,7 @@ def build_combined_model():
     micro_out = micro_model(input_layer)
     mobile_out = mobile_model(input_layer)
 
-    combined = layers.Concatenate()([micro_out, mobile_out])
+    combined = layers.Concatenate()([(lambda x: x * 0.7)(micro_out), (lambda x: x * 0.3)(mobile_out)])
     combined_output = Dense(len(emotion_labels), activation='softmax')(combined)
     model = Model(inputs=input_layer, outputs=combined_output)
 
