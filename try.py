@@ -10,11 +10,10 @@ from tensorflow.keras.regularizers import l2
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
 from collections import Counter
 import tensorflow as tf
 
-scaler = MinMaxScaler(feature_range=(0, 1))
+
 img_size = (48, 48)
 batch_size = 32
 # Paths and Constants
@@ -158,21 +157,9 @@ y_train = y_train.astype('float32')
 x_val_img = x_val_img.astype('float32')
 x_val_au = x_val_au.astype('float32')
 y_val = y_val.astype('float32')
-
-x_train_au = scaler.fit_transform(x_train_au)
-x_val_au = scaler.transform(x_val_au)
-
 print(f"x_train_img dtype: {x_train_img.dtype}")
 print(f"x_train_au dtype: {x_train_au.dtype}")
-print(f"x_train_au: {x_train_au}, {x_train_au.shape}")
-print(f"x_val_au: {x_val_au}, {x_val_au.shape}")
-# print(f"y_train shape: {y_train.shape}")
-# print(f"y_val shape: {y_val.shape}")
-print(f"Normalized x_train_au: {x_train_au[:5]}")
-print(f"Normalized x_val_au: {x_val_au[:5]}")
-
-print(f"x_train_au min: {x_train_au.min()}, max: {x_train_au.max()}")
-print(f"x_val_au min: {x_val_au.min()}, max: {x_val_au.max()}")
+print(f"y_train dtype: {y_train.dtype}")
 
 # Step 5: Define Hybrid Model
 def build_hybrid_model(input_shape_image=(48, 48, 3), input_shape_au=(len(selected_aus),)):
@@ -192,21 +179,16 @@ def build_hybrid_model(input_shape_image=(48, 48, 3), input_shape_au=(len(select
     y = BatchNormalization()(y)
     y = Dense(32, activation='relu')(y)
 
-    print(f"Expected AU labels: {len(selected_aus)}")
-    print(f"Actual AU labels in dataset: {image_au_features.shape[1]}")  # Replace `au_labels` with your AU dataset
-
-    au_output = Dense(len(selected_aus), activation='sigmoid', name="au_output")(y)
-
     # Concatenate branches
     combined = Concatenate()([x, y])
     z = Dense(64, activation='relu')(combined)
     z = Dropout(0.5)(z)
-    z = Dense(len(label_map), activation='softmax', name="emotion_output")(z)
+    z = Dense(len(label_map), activation='softmax')(z)
 
-    model = Model(inputs=[img_input, au_input], outputs=[z, au_output])
+    model = Model(inputs=[img_input, au_input], outputs=z)
     model.compile(optimizer=Adam(learning_rate=0.001),
-                  loss={'emotion_output': 'categorical_crossentropy', 'au_output': 'binary_crossentropy'},
-                  metrics={'emotion_output': 'accuracy', 'au_output': 'accuracy'})
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
     return model
 
 model = build_hybrid_model()
@@ -214,11 +196,8 @@ model.summary()
 
 # Step 6: Train the Model
 history = model.fit(
-    [x_train_img, x_train_au], [y_train, x_train_au],
-    validation_data=(
-        [x_val_img, x_val_au],  # Validation inputs
-        [y_val, x_val_au]  # Validation outputs
-    ),
+    [x_train_img, x_train_au], y_train,
+    validation_data=([x_val_img, x_val_au], y_val),
     epochs=25,
     batch_size=32,
     verbose=1
@@ -226,36 +205,21 @@ history = model.fit(
 
 def plot_training_history(history):
     """Plot training and validation accuracy and loss."""
-    em_acc = history.history['emotion_output_accuracy']
-    au_acc = history.history['emotion_output_accuracy']
-    em_val_acc = history.history['val_emotion_output_accuracy']
-    au_val_acc = history.history['val_au_output_accuracy']
-
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
     loss = history.history['loss']
-    em_loss = history.history['emotion_output_loss']
-    au_loss = history.history['au_output_loss']
     val_loss = history.history['val_loss']
-    em_val_loss = history.history['val_emotion_output_loss']
-    au_val_loss = history.history['val_au_output_loss']
 
-    epochs_range = range(len(em_acc))
+    epochs_range = range(len(acc))
 
-    plt.figure(figsize=(14, 10))
+    plt.figure(figsize=(12, 6))
 
     # Accuracy plot
-    plt.subplot(2, 2, 1)
-    plt.plot(epochs_range, em_acc, label='Emotion Accuracy')
-    plt.plot(epochs_range, em_val_acc, label='Val Emotion Accuracy')
-    plt.legend(loc='upper right')
-    plt.title('Emotion Accuracy')
-    plt.suptitle('Training and Validation Accuracy')
-
-    plt.subplot(2, 2, 1)
-    plt.plot(epochs_range, au_acc, label='AU Accuracy')
-    plt.plot(epochs_range, au_val_acc, label='Val AU Accuracy')
-    plt.legend(loc='upper right')
-    plt.title('AU Accuracy')
-    plt.suptitle('Training and Validation Accuracy')
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, acc, label='Training Accuracy')
+    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.title('Training and Validation Accuracy')
 
     # Loss plot
     plt.subplot(1, 2, 2)
@@ -264,7 +228,7 @@ def plot_training_history(history):
     plt.legend(loc='upper right')
     plt.title('Training and Validation Loss')
 
-    plt.savefig('train_au_metrics_with_loss_func_2_outputs.png')  # Save the figure, then close. Use plt.show() for immediate show
+    plt.savefig('train_au_metrics_with_l2.png')  # Save the figure, then close. Use plt.show() for immediate show
     plt.close()
 
 # Call the plotting function
