@@ -1,5 +1,6 @@
 import keras.losses
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from tensorflow.keras.models import Model
@@ -21,8 +22,14 @@ from collections import Counter
 img_size = (48, 48)
 batch_size = 32
 
-train_data_dir = 'Dataset/Train_1'
+train_data_dir = 'Dataset/Train'
 # test_data_dir = ''
+
+standardized_au_data_path = "action_units/aggregate report/normalized_final_au_image_data.csv"
+au_data = pd.read_csv(standardized_au_data_path)
+
+#image_filenames = [os.path.splitext()]
+
 
 train_datagen = ImageDataGenerator(
     rescale=1. / 255,
@@ -273,5 +280,5 @@ def predict_emotions_in_directory(directory_path, emotion_model):
 
 # Example usage:
 # Assuming you have the trained emotion model (e.g., `model`)
-directory_path = 'Dataset/Train_1/happy'  # Replace with your directory containing images
+directory_path = 'Dataset/Train/Happy'  # Replace with your directory containing images
 predict_emotions_in_directory(directory_path, trained_model)
