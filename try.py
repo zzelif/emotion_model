@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Conv2D, Flatten, Dropout, Concatenate, BatchNormalization
 from tensorflow.keras.optimizers import Adam
@@ -14,7 +15,7 @@ import tensorflow as tf
 train_data_dir = "Dataset/Train"
 standardized_au_data_path = "action_units/aggregate report/normalized_final_au_image_data.csv"
 img_size = (48, 48)
-selected_aus = [f"AU04_r", f"AU09_r", f"AU15_r", f"AU17_r", f"AU06_r", f"AU07_r", f"AU10_r", f"AU12_r", f"AU14_r", f"AU20_r"]
+selected_aus = [f"AU01_r", f"AU02_r", f"AU04_r", f"AU05_r", f"AU06_r", f"AU07_r", f"AU09_r", f"AU10_r", f"AU12_r", f"AU14_r", f"AU15_r", f"AU17_r", f"AU20_r", f"AU25_r", f"AU26_r"]
 
 # Step 1: Load AU Data
 au_data = pd.read_csv(standardized_au_data_path)
@@ -116,6 +117,18 @@ image_au_features = np.array(image_au_features)
 x_train_img, x_val_img, x_train_au, x_val_au, y_train, y_val = train_test_split(
     images, image_au_features, y, test_size=0.2, random_state=42
 )
+print(f"Shape of image_au_features: {image_au_features.shape}")
+print(f"Selected AUs: {selected_aus}")
+
+x_train_img = x_train_img.astype('float32')
+x_train_au = x_train_au.astype('float32')
+y_train = y_train.astype('float32')
+x_val_img = x_val_img.astype('float32')
+x_val_au = x_val_au.astype('float32')
+y_val = y_val.astype('float32')
+print(f"x_train_img dtype: {x_train_img.dtype}")
+print(f"x_train_au dtype: {x_train_au.dtype}")
+print(f"y_train dtype: {y_train.dtype}")
 
 # Step 5: Define Hybrid Model
 def build_hybrid_model(input_shape_image=(48, 48, 3), input_shape_au=(len(selected_aus),)):
@@ -159,7 +172,113 @@ history = model.fit(
     verbose=1
 )
 
+def plot_training_history(history):
+    """Plot training and validation accuracy and loss."""
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    epochs_range = range(len(acc))
+
+    plt.figure(figsize=(12, 6))
+
+    # Accuracy plot
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, acc, label='Training Accuracy')
+    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.title('Training and Validation Accuracy')
+
+    # Loss plot
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs_range, loss, label='Training Loss')
+    plt.plot(epochs_range, val_loss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation Loss')
+
+    plt.savefig('train_au_metrics.png')  # Save the figure, then close. Use plt.show() for immediate show
+    plt.close()
+
+# Call the plotting function
+plot_training_history(history)
+
 # Step 7: Evaluate the Model
 loss, accuracy = model.evaluate([x_val_img, x_val_au], y_val)
 print(f"Validation Accuracy: {accuracy:.2f}")
 
+
+def load_and_preprocess_image(image_path, img_size=(48, 48)):
+    """Load, resize, convert to RGB, and normalize the image."""
+    # Load the image
+    img = cv2.imread(image_path)
+    if img is None:
+        print(f"Failed to load image: {image_path}")
+        return None
+
+    # Resize the image
+    img_resized = cv2.resize(img, img_size)
+
+    # Normalize pixel values and add a batch dimension
+    img_normalized = np.expand_dims(img_resized, axis=0) / 255.0
+    return img_normalized
+
+
+def predict_emotion_from_image(image_path, model, au_features_dict, img_size=(48, 48)):
+    """Predict emotion from an image and associated AU features."""
+    # Preprocess the image
+    img_normalized = load_and_preprocess_image(image_path, img_size)
+    if img_normalized is None:
+        return None, None
+
+    img_normalized = img_normalized.astype('float32')
+
+    # Extract the base filename to find corresponding AU features
+    base_filename = os.path.splitext(os.path.basename(image_path))[0].lower().strip()
+
+    # Check if the AU features for this image exist
+    if base_filename not in au_features_dict:
+        print(f"No AU features found for {base_filename}. Skipping prediction.")
+        return None, None
+
+    # Get the AU features and expand dimensions for batching
+    au_features = np.expand_dims(au_features_dict[base_filename], axis=0).astype('float32')
+
+    # Predict the emotion
+    predictions = model.predict([img_normalized, au_features])
+    predicted_class = np.argmax(predictions)
+    confidence_level = predictions[0][predicted_class]
+
+    # Map the predicted class back to the emotion label
+    predicted_emotion = list(label_map.keys())[list(label_map.values()).index(predicted_class)]
+    return predicted_emotion, confidence_level
+
+
+def predict_emotions_in_directory(directory_path, model, au_features_dict, img_size=(48, 48)):
+    """Predict emotions for all images in a directory and tally results."""
+    emotion_tally = Counter()
+
+    # Get all image file paths in the directory
+    image_paths = [os.path.join(directory_path, fname) for fname in os.listdir(directory_path)
+                   if fname.lower().endswith(('jpg', 'jpeg', 'png'))]
+
+    for image_path in image_paths:
+        predicted_emotion, confidence_level = predict_emotion_from_image(image_path, model, au_features_dict, img_size)
+        if predicted_emotion is not None:
+            emotion_tally[predicted_emotion] += 1
+
+            # Print the result
+            print(f"Image: {image_path}")
+            print(f"Predicted Emotion: {predicted_emotion} ({confidence_level * 100:.2f}%)")
+            print("-" * 50)
+
+    print("\nEmotion Tally:")
+    for emotion, count in emotion_tally.items():
+        print(f"{emotion}: {count}")
+
+    return emotion_tally
+
+
+# Example usage:
+directory_path = "Dataset/Train/Angry"  # Replace with your test directory path
+predict_emotions_in_directory(directory_path, model, au_features_dict, img_size=(48, 48))
