@@ -7,15 +7,45 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Conv2D, Flatten, Dropout, Concatenate, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.model_selection import train_test_split
 from collections import Counter
 import tensorflow as tf
 
+
+img_size = (48, 48)
+batch_size = 32
 # Paths and Constants
 train_data_dir = "Dataset/Train"
 standardized_au_data_path = "action_units/aggregate report/normalized_final_au_image_data.csv"
-img_size = (48, 48)
 selected_aus = [f"AU01_r", f"AU02_r", f"AU04_r", f"AU05_r", f"AU06_r", f"AU07_r", f"AU09_r", f"AU10_r", f"AU12_r", f"AU14_r", f"AU15_r", f"AU17_r", f"AU20_r", f"AU25_r", f"AU26_r"]
+
+train_datagen = ImageDataGenerator(
+    rescale=1. / 255,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    validation_split=0.2
+)
+# test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+train_generator = train_datagen.flow_from_directory(
+    train_data_dir,
+    target_size=img_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='training'
+)
+
+validation_generator = train_datagen.flow_from_directory(
+    train_data_dir,
+    target_size=img_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='validation'
+)
+
+emotion_labels = list(train_generator.class_indices.keys())
 
 # Step 1: Load AU Data
 au_data = pd.read_csv(standardized_au_data_path)
