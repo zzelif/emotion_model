@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+from sklearn.preprocessing import StandardScaler
 #
 # #Aggregate the individual csv
 # csv_directory = "action_units/angry"
@@ -60,6 +61,18 @@ selected_aus = [f"AU04{intensity_suffix}", f"AU09{intensity_suffix}", f"AU15{int
                 f"AU20{intensity_suffix}", f"AU01{intensity_suffix}", f"AU02{intensity_suffix}",
                 f"AU05{intensity_suffix}", f"AU25{intensity_suffix}", f"AU26{intensity_suffix}"]
 
+# selected_aus = {
+#     'Angry': [f"AU04", intensity_suffix, f"AU09", intensity_suffix, f"AU15", intensity_suffix, f"AU17", intensity_suffix],
+#     'Happy': [f"AU06", intensity_suffix, f"AU07", intensity_suffix, f"AU10", intensity_suffix, f"AU12", intensity_suffix,
+#               f"AU14", intensity_suffix, f"AU20", intensity_suffix],
+#     'Neutral': [f"AU02", intensity_suffix, f"AU05", intensity_suffix],
+#     'Sadness': [f"AU01", intensity_suffix, f"AU04", intensity_suffix, f"AU06", intensity_suffix, f"AU07", intensity_suffix,
+#                 f"AU09", intensity_suffix, f"AU12", intensity_suffix, f"AU15", intensity_suffix, f"AU17", intensity_suffix,
+#                 f"AU20", intensity_suffix],
+#     'Surprised': [f"AU01", intensity_suffix, f"AU02", intensity_suffix, f"AU05", intensity_suffix, f"AU025", intensity_suffix,
+#                   f"AU26", intensity_suffix]
+# }
+
 # Check for missing columns
 missing_columns = [col for col in selected_aus if col not in combined_df.columns]
 if missing_columns:
@@ -96,3 +109,17 @@ filtered_df = filtered_df[filtered_df['filename'].isin(image_files)]
 output_path = "action_units/aggregate report/final_au_image_data.csv"
 filtered_df.to_csv(output_path, index=False)
 print(f"Final filtered data saved to {output_path} with shape {filtered_df.shape}")
+
+#
+# Normalize AU values
+#
+au_columns = [col for col in filtered_df.columns if col.endswith('_r')]  # Identify AU columns
+scaler = StandardScaler()
+
+# Apply normalization to AU columns
+filtered_df[au_columns] = scaler.fit_transform(filtered_df[au_columns])
+
+# Save the normalized dataset
+normalized_output_path = "action_units/aggregate report/normalized_final_au_image_data.csv"
+filtered_df.to_csv(normalized_output_path, index=False)
+print(f"Normalized data saved to {normalized_output_path} with shape {filtered_df.shape}")
