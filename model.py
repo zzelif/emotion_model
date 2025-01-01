@@ -46,3 +46,16 @@ def build_finetuned_mobilenetv2(input_shape_image, num_classes):
                   loss='categorical_crossentropy',
                   metrics=['accuracy', 'Precision', 'Recall'])
     return model
+
+def finetune_built_mobilenetv2(model, num_unfrozen_layers, learning_rate):
+    model.trainable = True
+
+    for layer in model.layers[:-num_unfrozen_layers]:
+        layer.trainable = False
+
+    model.compile(
+        optimizer=Adam(learning_rate=learning_rate),
+        loss='categorical_crossentropy',
+        metrics=['accuracy', 'Precision', 'Recall']
+    )
+    return model
