@@ -27,7 +27,7 @@ def create_generators(train_data_dir, test_data_dir, img_size, batch_size):
 def train_model(model, x_train_img, x_train_au, y_train, x_val_img, x_val_au, y_val, batch_size, epochs, save_path):
     early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
     checkpoint = ModelCheckpoint(save_path, monitor='val_loss', save_best_only=True)
-    lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.35, patience=5, mode='auto', min_lr=1e-6, verbose=1)
+    lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, mode='auto', min_lr=1e-6, verbose=1)
 
     if x_train_au is None or x_val_au is None:
         train_inputs = x_train_img
