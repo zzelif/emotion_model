@@ -81,6 +81,18 @@ def preprocess_data(images, labels, image_au_features, test_size=0.2):
     label_map = {label: idx for idx, label in enumerate(sorted(set(labels)))}
     encoded_labels = np.array([label_map[label] for label in labels])
     encoded_labels = to_categorical(encoded_labels)
+    if image_au_features is None:
+        # When AU features are not required
+        x_train_img, x_val_img, y_train, y_val = train_test_split(
+            images, encoded_labels, test_size=test_size, random_state=42
+        )
+        x_train_img = x_train_img.astype('float32')
+        y_train = y_train.astype('float32')
+        x_val_img = x_val_img.astype('float32')
+        y_val = y_val.astype('float32')
+
+        return x_train_img, x_val_img, None, None, y_train, y_val, label_map
+
     image_au_features = np.array(image_au_features)
     print(f"images shape: {images.shape}")
     print(f"image_au_features shape: {image_au_features.shape}")
