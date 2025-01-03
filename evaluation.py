@@ -1,8 +1,11 @@
 import matplotlib.pyplot as plt
-from collections import Counter
 import os
 import numpy as np
 import cv2
+import seaborn as sns
+from collections import Counter
+from sklearn.metrics import confusion_matrix
+# from entry import timestamp
 
 def plot_training_history(histories, labels, output_path):
     plt.figure(figsize=(12, 6))
@@ -34,13 +37,27 @@ def plot_training_history(histories, labels, output_path):
     plt.savefig(output_path)
     plt.close()
 
+def plot_confusion_matrix(model, inputs, y_true, label_map, title="Confusion Matrix"):
+    y_pred = model.predict(inputs)
+    y_pred_classes = np.argmax(y_pred, axis=1)
+    y_true_classes = np.argmax(y_true, axis=1)
 
-def evaluate_model(model, x_val_img, x_val_au, y_val):
-    # Check if the model expects multiple inputs
-    if isinstance(model.input, list) and len(model.input) > 1:
-        inputs = [x_val_img, x_val_au]
+    conf_matrix = confusion_matrix(y_true_classes, y_pred_classes)
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=label_map.keys(), yticklabels=label_map.keys())
+    plt.title(title)
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+
+    plt.tight_layout()
+    plt.savefig(f"metrics/confusion_matrix_report_830.png")
+    plt.close()
+
+def evaluate_model(model, x_val_inputs, y_val):
+    # Check the number of inputs the model expects
+    if isinstance(model.input, list):
+        inputs = x_val_inputs  # Use the provided inputs directly for multi-input models
     else:
-        inputs = x_val_img  # Single input model (e.g., MobileNetV2)
+        inputs = x_val_inputs[0]  # Use the first input if it's a single-input model
 
     # Evaluate the model
     loss, accuracy, precision, recall = model.evaluate(inputs, y_val)

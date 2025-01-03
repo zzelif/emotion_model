@@ -1,5 +1,6 @@
 import os
 import cv2
+import pickle
 import numpy as np
 import pandas as pd
 from tensorflow.keras.utils import to_categorical
@@ -9,11 +10,6 @@ def load_au_data(file_path):
     return pd.read_csv(file_path)
 
 def match_images_with_au(train_data_dir, au_data):
-    # image_files = [
-    #     os.path.join(root, file).replace('\\', '/')
-    #     for root, _, files in os.walk(train_data_dir)
-    #     for file in files if file.lower().endswith(('jpg', 'jpeg', 'png'))
-    # ]
     possible_extensions = ['.jpeg', '.jpg', '.png']
 
     image_files = []
@@ -82,7 +78,6 @@ def preprocess_data(images, labels, image_au_features, test_size=0.2):
     encoded_labels = np.array([label_map[label] for label in labels])
     encoded_labels = to_categorical(encoded_labels)
     if image_au_features is None:
-        # When AU features are not required
         x_train_img, x_val_img, y_train, y_val = train_test_split(
             images, encoded_labels, test_size=test_size, random_state=42
         )
@@ -94,9 +89,6 @@ def preprocess_data(images, labels, image_au_features, test_size=0.2):
         return x_train_img, x_val_img, None, None, y_train, y_val, label_map
 
     image_au_features = np.array(image_au_features)
-    print(f"images shape: {images.shape}")
-    print(f"image_au_features shape: {image_au_features.shape}")
-    print(f"encoded_labels shape: {encoded_labels.shape}")
     x_train_img, x_val_img, x_train_au, x_val_au, y_train, y_val = train_test_split(
         images, image_au_features, encoded_labels, test_size=test_size, random_state=42
     )
@@ -108,3 +100,14 @@ def preprocess_data(images, labels, image_au_features, test_size=0.2):
     y_val = y_val.astype('float32')
 
     return x_train_img, x_val_img, x_train_au, x_val_au, y_train, y_val, label_map
+
+# Cache and Load functions
+def save_cached_data(file_path, data):
+    with open(file_path, 'wb') as f:
+        pickle.dump(data, f)
+
+def load_cached_data(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as f:
+            return pickle.load(f)
+    return None

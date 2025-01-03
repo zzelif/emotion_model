@@ -30,7 +30,7 @@ def build_hybrid_microexpression_model(input_shape_image, input_shape_au, num_cl
                   metrics=['accuracy', 'Precision', 'Recall'])
     return model
 
-def build_finetuned_mobilenetv2(input_shape_image, num_classes):
+def build_frozen_mobilenetv2(input_shape_image, num_classes):
     base_model = MobileNetV2(include_top=False, weights='imagenet', input_shape=input_shape_image)
     base_model.trainable = False
 
@@ -58,4 +58,27 @@ def finetune_built_mobilenetv2(model, num_unfrozen_layers, learning_rate):
         loss='categorical_crossentropy',
         metrics=['accuracy', 'Precision', 'Recall']
     )
+    return model
+
+
+def build_combine_cnns(mobilenet_output_shape, input_shape_image, input_shape_au, num_classes):
+    mobilenet_output = Input(shape=mobilenet_output_shape, name="mobilenet_output")
+    img_input = Input(shape=input_shape_image, name="image_input")
+    au_input = Input(shape=input_shape_au, name="au_input")
+
+    flt_img_input = Flatten()(img_input)
+
+    combined = Concatenate()([mobilenet_output, flt_img_input, au_input])
+    x = Dense(128, activation='relu')(combined)
+    x = Dense(64, activation='relu')(x)
+    final_output = Dense(num_classes, activation='softmax')(x)
+
+    model = Model(inputs=[mobilenet_output, img_input, au_input], outputs=final_output)
+    model.compile(
+        optimizer=Adam(learning_rate=0.001),
+        loss='categorical_crossentropy',
+        metrics=['accuracy', 'Precision', 'Recall']
+    )
+    model.summary()
+
     return model

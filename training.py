@@ -24,21 +24,21 @@ def create_generators(train_data_dir, test_data_dir, img_size, batch_size):
     )
     return train_generator, val_generator, test_generator
 
-def train_model(model, x_train_img, x_train_au, y_train, x_val_img, x_val_au, y_val, batch_size, epochs, save_path):
+def train_model(model, train_inputs, y_train, val_inputs, y_val, batch_size, epochs, save_path):
     early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
     checkpoint = ModelCheckpoint(save_path, monitor='val_loss', save_best_only=True)
     lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, mode='auto', min_lr=1e-6, verbose=1)
 
-    if x_train_au is None or x_val_au is None:
-        train_inputs = x_train_img
-        val_inputs = x_val_img
+    if isinstance(model.input, list):
+        x_inputs = train_inputs  # Use the provided inputs directly for multi-input models
+        x_val = val_inputs
     else:
-        train_inputs = [x_train_img, x_train_au]
-        val_inputs = [x_val_img, x_val_au]
+        x_inputs = train_inputs[0]
+        x_val = val_inputs[0]
 
     return model.fit(
-        train_inputs, y_train,
-        validation_data=(val_inputs, y_val),
+        x_inputs, y_train,
+        validation_data=(x_val, y_val),
         epochs=epochs,
         batch_size=batch_size,
         callbacks=[early_stopping, checkpoint, lr_scheduler]
